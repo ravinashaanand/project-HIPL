@@ -1,0 +1,102 @@
+{
+  "name": "05 - Logistics Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerType": "webhook"
+      },
+      "name": "Webhook - Dispatch",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "INSERT INTO shipments (order_id, customer_id, dispatch_date, status, tracking_number) VALUES ({{ $node['Webhook - Dispatch'].json.order_id }}, {{ $node['Webhook - Dispatch'].json.customer_id }}, NOW(), 'dispatched', CONCAT('HIPL', DATE_FORMAT(NOW(), '%Y%m%d'), LPAD(LAST_INSERT_ID(), 6, '0')))"
+      },
+      "name": "Create Shipment",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http",
+        "requestMethod": "POST",
+        "url": "http://logistics-partner-api.local/api/shipments",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tracking_number",
+              "value": "={{ $node['Create Shipment'].json.tracking_number }}"
+            },
+            {
+              "name": "destination",
+              "value": "={{ $node['Webhook - Dispatch'].json.destination }}"
+            },
+            {
+              "name": "weight",
+              "value": "={{ $node['Webhook - Dispatch'].json.weight }}"
+            }
+          ]
+        }
+      },
+      "name": "Register with Logistics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "toEmail": "{{ $node['Webhook - Dispatch'].json.customer_email }}",
+        "subject": "Your Order Has Been Dispatched - Tracking: {{ $node['Create Shipment'].json.tracking_number }}",
+        "htmlBody": "<h2>Shipment Notification</h2><p>Tracking Number: {{ $node['Create Shipment'].json.tracking_number }}</p><p>Expected Delivery: {{ $node['Register with Logistics'].json.estimated_delivery }}</p>"
+      },
+      "name": "Notify Customer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "UPDATE shipments SET status = 'in_transit', updated_at = NOW() WHERE tracking_number = '{{ $node['Create Shipment'].json.tracking_number }}'"
+      },
+      "name": "Update Status",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Dispatch": {
+      "main": [[{"node": "Create Shipment", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Create Shipment": {
+      "main": [[{"node": "Register with Logistics", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Register with Logistics": {
+      "main": [[{"node": "Notify Customer", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Notify Customer": {
+      "main": [[{"node": "Update Status", "branch": 0, "type": "main", "index": 0}]]
+    }
+  },
+  "description": "Automated logistics workflows including dispatch planning, shipment tracking, and real-time updates",
+  "department": "Logistics & Supply Chain",
+  "features": [
+    "Dispatch planning automation",
+    "Shipment tracking integration",
+    "Delivery confirmation workflows",
+    "Transporter coordination",
+    "E-way bill automation",
+    "Route optimization",
+    "Real-time GPS tracking",
+    "Documentation automation"
+  ]
+}

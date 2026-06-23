@@ -1,0 +1,96 @@
+{
+  "name": "03 - Production Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerType": "schedule",
+        "schedule": "0 * * * *"
+      },
+      "name": "Hourly Monitor",
+      "type": "n8n-nodes-base.schedule",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http",
+        "requestMethod": "GET",
+        "url": "http://iot-gateway.hemraj.local/api/machines/status"
+      },
+      "name": "Get IoT Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "INSERT INTO production_logs (machine_id, status, efficiency, downtime_minutes, timestamp) VALUES ({{ $node['Get IoT Data'].json.machines[0].id }}, '{{ $node['Get IoT Data'].json.machines[0].status }}', {{ $node['Get IoT Data'].json.machines[0].efficiency }}, {{ $node['Get IoT Data'].json.machines[0].downtime }}, NOW())"
+      },
+      "name": "Log Production Data",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "conditions": [
+          {
+            "condition": {
+              "value1": "={{ $node['Get IoT Data'].json.machines[0].downtime }}",
+              "operation": ">",
+              "value2": 30
+            },
+            "node": "Alert Maintenance"
+          }
+        ]
+      },
+      "name": "Check Downtime",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "toEmail": "production@hemrajgroup.com,maintenance@hemrajgroup.com",
+        "subject": "🚨 ALERT: Machine Downtime Exceeds Threshold",
+        "htmlBody": "<h2>Production Alert</h2><p>Machine: {{ $node['Get IoT Data'].json.machines[0].name }}</p><p>Downtime: {{ $node['Get IoT Data'].json.machines[0].downtime }} minutes</p>"
+      },
+      "name": "Alert Maintenance",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Hourly Monitor": {
+      "main": [[{"node": "Get IoT Data", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Get IoT Data": {
+      "main": [[{"node": "Log Production Data", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Log Production Data": {
+      "main": [[{"node": "Check Downtime", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Check Downtime": {
+      "main": [
+        [{"node": "Alert Maintenance", "branch": 0, "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "description": "Real-time production monitoring with IoT integration and downtime alerts",
+  "department": "Production & Operations",
+  "features": [
+    "IoT device data collection",
+    "Real-time machine monitoring",
+    "Downtime alert escalation",
+    "Production planning automation",
+    "Shift reporting",
+    "Efficiency tracking",
+    "Maintenance scheduling",
+    "Predictive maintenance"
+  ]
+}

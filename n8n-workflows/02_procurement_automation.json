@@ -1,0 +1,108 @@
+{
+  "name": "02 - Procurement Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerType": "schedule",
+        "schedule": "0 0 * * *"
+      },
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.schedule",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM inventory WHERE quantity <= reorder_level AND status = 'active'"
+      },
+      "name": "Check Stock Levels",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http",
+        "requestMethod": "GET",
+        "url": "http://localhost:8000/api/v1/procurement/vendors",
+        "options": {
+          "queryParameters": {
+            "category": "={{ $node['Check Stock Levels'].json.rows[0].category }}"
+          }
+        }
+      },
+      "name": "Get Vendor List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http",
+        "requestMethod": "POST",
+        "url": "http://localhost:8000/api/v1/procurement/purchase-orders",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "vendor_id",
+              "value": "={{ $node['Get Vendor List'].json.data[0].id }}"
+            },
+            {
+              "name": "items",
+              "value": "={{ $node['Check Stock Levels'].json.rows }}"
+            },
+            {
+              "name": "quantity",
+              "value": "={{ $node['Check Stock Levels'].json.rows[0].reorder_quantity }}"
+            }
+          ]
+        }
+      },
+      "name": "Create Purchase Order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "toEmail": "procurement@hemrajgroup.com",
+        "subject": "Auto-Generated Purchase Order - {{ $now.format('YYYY-MM-DD') }}",
+        "htmlBody": "<h2>Purchase Order Generated</h2><p>PO ID: {{ $node['Create Purchase Order'].json.po_id }}</p><p>Vendor: {{ $node['Get Vendor List'].json.data[0].name }}</p>"
+      },
+      "name": "Notify Procurement",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Daily Schedule": {
+      "main": [[{"node": "Check Stock Levels", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Check Stock Levels": {
+      "main": [[{"node": "Get Vendor List", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Get Vendor List": {
+      "main": [[{"node": "Create Purchase Order", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Create Purchase Order": {
+      "main": [[{"node": "Notify Procurement", "branch": 0, "type": "main", "index": 0}]]
+    }
+  },
+  "description": "Automated procurement workflows including RFQ, PO creation, vendor management",
+  "department": "Procurement & Vendor Management",
+  "features": [
+    "Purchase requisition automation",
+    "Vendor onboarding workflows",
+    "RFQ generation and tracking",
+    "Automatic PO creation on low stock",
+    "Vendor performance tracking",
+    "Contract management",
+    "Payment terms automation",
+    "Compliance verification"
+  ]
+}

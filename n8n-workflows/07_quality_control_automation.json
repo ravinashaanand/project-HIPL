@@ -1,0 +1,95 @@
+{
+  "name": "07 - Quality Control Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerType": "webhook"
+      },
+      "name": "Webhook - QC Data",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "INSERT INTO quality_checks (batch_id, check_type, status, result_value, checked_by, checked_at) VALUES ({{ $node['Webhook - QC Data'].json.batch_id }}, '{{ $node['Webhook - QC Data'].json.check_type }}', '{{ $node['Webhook - QC Data'].json.status }}', {{ $node['Webhook - QC Data'].json.result_value }}, {{ $node['Webhook - QC Data'].json.checked_by }}, NOW())"
+      },
+      "name": "Log QC Result",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "conditions": [
+          {
+            "condition": {
+              "value1": "={{ $node['Webhook - QC Data'].json.status }}",
+              "operation": "===",
+              "value2": "failed"
+            },
+            "node": "Create Non-Conformance"
+          }
+        ]
+      },
+      "name": "Check Status",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "INSERT INTO non_conformance (batch_id, issue_description, severity, reported_by, status) VALUES ({{ $node['Webhook - QC Data'].json.batch_id }}, '{{ $node['Webhook - QC Data'].json.issue_description }}', '{{ $node['Webhook - QC Data'].json.severity }}', {{ $node['Webhook - QC Data'].json.checked_by }}, 'open')"
+      },
+      "name": "Create Non-Conformance",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "toEmail": "quality@hemrajgroup.com,production@hemrajgroup.com",
+        "subject": "🚨 Quality Alert - Non-Conformance Report",
+        "htmlBody": "<h2>Quality Issue Detected</h2><p>Batch: {{ $node['Webhook - QC Data'].json.batch_id }}</p><p>Issue: {{ $node['Webhook - QC Data'].json.issue_description }}</p><p>Severity: {{ $node['Webhook - QC Data'].json.severity }}</p>"
+      },
+      "name": "Alert Quality Team",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - QC Data": {
+      "main": [[{"node": "Log QC Result", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Log QC Result": {
+      "main": [[{"node": "Check Status", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Check Status": {
+      "main": [
+        [{"node": "Create Non-Conformance", "branch": 0, "type": "main", "index": 0}]
+      ]
+    },
+    "Create Non-Conformance": {
+      "main": [[{"node": "Alert Quality Team", "branch": 0, "type": "main", "index": 0}]]
+    }
+  },
+  "description": "QC data capture, non-conformance detection, audit workflows, and CAPA tracking",
+  "department": "Quality Control & Assurance",
+  "features": [
+    "QC data capture automation",
+    "Non-conformance detection",
+    "Audit workflow automation",
+    "CAPA (Corrective and Preventive Actions) tracking",
+    "Quality metrics reporting",
+    "Compliance monitoring",
+    "Root cause analysis",
+    "Trend analysis"
+  ]
+}

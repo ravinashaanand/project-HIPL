@@ -1,0 +1,95 @@
+{
+  "name": "08 - Sales Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerType": "webhook"
+      },
+      "name": "Webhook - New Order",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "SELECT credit_limit, current_credit_used FROM customers WHERE id = {{ $node['Webhook - New Order'].json.customer_id }}"
+      },
+      "name": "Check Credit Limit",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "conditions": [
+          {
+            "condition": {
+              "value1": "={{ $node['Check Credit Limit'].json.rows[0].credit_limit }}",
+              "operation": ">",
+              "value2": "={{ $node['Check Credit Limit'].json.rows[0].current_credit_used + $node['Webhook - New Order'].json.order_amount }}"
+            },
+            "node": "Process Order"
+          }
+        ]
+      },
+      "name": "Validate Credit",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "INSERT INTO orders (customer_id, order_date, total_amount, status) VALUES ({{ $node['Webhook - New Order'].json.customer_id }}, NOW(), {{ $node['Webhook - New Order'].json.order_amount }}, 'confirmed')"
+      },
+      "name": "Process Order",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "toEmail": "{{ $node['Webhook - New Order'].json.customer_email }}",
+        "subject": "Order Confirmation - {{ $node['Process Order'].json.order_id }}",
+        "htmlBody": "<h2>Order Confirmed</h2><p>Order ID: {{ $node['Process Order'].json.order_id }}</p><p>Amount: ₹{{ $node['Webhook - New Order'].json.order_amount }}</p>"
+      },
+      "name": "Send Confirmation",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - New Order": {
+      "main": [[{"node": "Check Credit Limit", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Check Credit Limit": {
+      "main": [[{"node": "Validate Credit", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Validate Credit": {
+      "main": [
+        [{"node": "Process Order", "branch": 0, "type": "main", "index": 0}]
+      ]
+    },
+    "Process Order": {
+      "main": [[{"node": "Send Confirmation", "branch": 0, "type": "main", "index": 0}]]
+    }
+  },
+  "description": "Automated sales workflows including order processing, CRM integration, and customer notifications",
+  "department": "Sales & Customer Management",
+  "features": [
+    "Order processing automation",
+    "CRM integration",
+    "Credit limit validation",
+    "Automated invoicing",
+    "Customer communication",
+    "Sales performance tracking",
+    "Lead management",
+    "Sales forecasting"
+  ]
+}

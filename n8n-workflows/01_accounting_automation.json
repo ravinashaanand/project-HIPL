@@ -1,0 +1,97 @@
+{
+  "name": "01 - Accounting Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerType": "webhook"
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM invoices WHERE status = 'pending' AND created_at >= NOW() - INTERVAL 1 DAY"
+      },
+      "name": "Get Pending Invoices",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "resource": "http",
+        "requestMethod": "POST",
+        "url": "http://localhost:8000/api/v1/accounting/invoices/process",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "invoices",
+              "value": "={{ $node['Get Pending Invoices'].json.rows }}"
+            }
+          ]
+        }
+      },
+      "name": "Process Invoices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "UPDATE invoices SET status = 'processed', updated_at = NOW() WHERE id IN ({{ $node['Process Invoices'].json.processed_ids.join(',') }});"
+      },
+      "name": "Update Invoice Status",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "toEmail": "finance@hemrajgroup.com",
+        "subject": "Daily Invoice Processing Report",
+        "htmlBody": "<h2>Invoice Processing Summary</h2><p>Processed: {{ $node['Process Invoices'].json.processed_count }} invoices</p>"
+      },
+      "name": "Send Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{"node": "Get Pending Invoices", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Get Pending Invoices": {
+      "main": [[{"node": "Process Invoices", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Process Invoices": {
+      "main": [[{"node": "Update Invoice Status", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Update Invoice Status": {
+      "main": [[{"node": "Send Notification", "branch": 0, "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "description": "Automated invoice processing, payment approvals, bank reconciliation, GST/TDS tracking",
+  "department": "Accounting & Finance",
+  "features": [
+    "Invoice data extraction from PDFs",
+    "Automatic invoice matching with POs",
+    "Payment approval workflow routing",
+    "Bank reconciliation automation",
+    "GST/TDS compliance tracking",
+    "Expense management",
+    "Financial MIS reporting",
+    "Real-time notifications"
+  ]
+}

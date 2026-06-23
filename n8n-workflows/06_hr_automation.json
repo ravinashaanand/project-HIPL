@@ -1,0 +1,88 @@
+{
+  "name": "06 - HR Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerType": "webhook"
+      },
+      "name": "Webhook - Onboarding",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "INSERT INTO employees (first_name, last_name, email, department_id, position, hire_date, status) VALUES ('{{ $node['Webhook - Onboarding'].json.first_name }}', '{{ $node['Webhook - Onboarding'].json.last_name }}', '{{ $node['Webhook - Onboarding'].json.email }}', {{ $node['Webhook - Onboarding'].json.department_id }}, '{{ $node['Webhook - Onboarding'].json.position }}', NOW(), 'active')"
+      },
+      "name": "Create Employee Record",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "toEmail": "{{ $node['Webhook - Onboarding'].json.email }}",
+        "subject": "Welcome to Hemraj Group - Account Created",
+        "htmlBody": "<h2>Welcome {{ $node['Webhook - Onboarding'].json.first_name }}!</h2><p>Your employee account has been created.</p><p>Department: {{ $node['Webhook - Onboarding'].json.department }}</p>"
+      },
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "INSERT INTO onboarding_checklist (employee_id, task, status, due_date) VALUES ({{ $node['Create Employee Record'].json.employee_id }}, 'IT Setup', 'pending', DATE_ADD(NOW(), INTERVAL 1 DAY))"
+      },
+      "name": "Create Onboarding Tasks",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "toEmail": "hr@hemrajgroup.com",
+        "subject": "New Employee Onboarding - {{ $node['Webhook - Onboarding'].json.first_name }} {{ $node['Webhook - Onboarding'].json.last_name }}",
+        "htmlBody": "<h2>New Hire Notification</h2><p>Employee: {{ $node['Create Employee Record'].json.employee_id }}</p><p>Position: {{ $node['Webhook - Onboarding'].json.position }}</p>"
+      },
+      "name": "Notify HR",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Onboarding": {
+      "main": [[{"node": "Create Employee Record", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Create Employee Record": {
+      "main": [[{"node": "Send Welcome Email", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Send Welcome Email": {
+      "main": [[{"node": "Create Onboarding Tasks", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Create Onboarding Tasks": {
+      "main": [[{"node": "Notify HR", "branch": 0, "type": "main", "index": 0}]]
+    }
+  },
+  "description": "Automated HR workflows including employee onboarding, attendance tracking, and payroll integration",
+  "department": "HR & Administration",
+  "features": [
+    "Employee onboarding automation",
+    "Exit workflow automation",
+    "Attendance system integration",
+    "Leave management",
+    "Payroll input automation",
+    "Compliance document tracking",
+    "Internal communication",
+    "Approval workflows"
+  ]
+}

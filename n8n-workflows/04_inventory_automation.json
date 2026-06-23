@@ -1,0 +1,86 @@
+{
+  "name": "04 - Inventory Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerType": "webhook"
+      },
+      "name": "Webhook - GRN Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "INSERT INTO grn (po_id, received_quantity, received_date, status) VALUES ({{ $node['Webhook - GRN Trigger'].json.po_id }}, {{ $node['Webhook - GRN Trigger'].json.quantity }}, NOW(), 'pending_verification')"
+      },
+      "name": "Create GRN",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "UPDATE inventory SET quantity = quantity + {{ $node['Webhook - GRN Trigger'].json.quantity }}, updated_at = NOW() WHERE product_id = {{ $node['Webhook - GRN Trigger'].json.product_id }}"
+      },
+      "name": "Update Stock Level",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "resource": "mysql",
+        "operation": "executeQuery",
+        "query": "INSERT INTO batch_tracking (grn_id, product_id, batch_number, expiry_date, quantity) VALUES ({{ $node['Create GRN'].json.grn_id }}, {{ $node['Webhook - GRN Trigger'].json.product_id }}, '{{ $node['Webhook - GRN Trigger'].json.batch_number }}', '{{ $node['Webhook - GRN Trigger'].json.expiry_date }}', {{ $node['Webhook - GRN Trigger'].json.quantity }})"
+      },
+      "name": "Track Batch",
+      "type": "n8n-nodes-base.mysql",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "toEmail": "inventory@hemrajgroup.com",
+        "subject": "GRN Processed - {{ $node['Create GRN'].json.grn_id }}",
+        "htmlBody": "<h2>Goods Receipt Note Created</h2><p>GRN ID: {{ $node['Create GRN'].json.grn_id }}</p><p>Stock Updated: +{{ $node['Webhook - GRN Trigger'].json.quantity }} units</p>"
+      },
+      "name": "Notify Inventory",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - GRN Trigger": {
+      "main": [[{"node": "Create GRN", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Create GRN": {
+      "main": [[{"node": "Update Stock Level", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Update Stock Level": {
+      "main": [[{"node": "Track Batch", "branch": 0, "type": "main", "index": 0}]]
+    },
+    "Track Batch": {
+      "main": [[{"node": "Notify Inventory", "branch": 0, "type": "main", "index": 0}]]
+    }
+  },
+  "description": "Real-time inventory tracking, GRN automation, batch management and expiry monitoring",
+  "department": "Inventory & Warehouse Management",
+  "features": [
+    "Real-time stock tracking",
+    "Low stock alerts",
+    "GRN automation",
+    "Stock movement reconciliation",
+    "Batch tracking and traceability",
+    "Expiry date monitoring",
+    "Warehouse utilization reports",
+    "Stock reconciliation workflows"
+  ]
+}
